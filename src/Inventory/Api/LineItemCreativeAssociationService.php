@@ -5,6 +5,7 @@ namespace Inventory\Api;
 use Google\AdsApi\AdManager\Util\v201911\StatementBuilder;
 use Google\AdsApi\AdManager\v201911\LineItemCreativeAssociation;
 use Google\AdsApi\AdManager\v201911\DeactivateLineItemCreativeAssociations;
+use Google\AdsApi\AdManager\v201911\DeleteLineItemCreativeAssociations;
 
 
 class LineItemCreativeAssociationService {
@@ -107,5 +108,50 @@ class LineItemCreativeAssociationService {
 		}
 
 		return $response;
+	}
+
+	public function delete( $creativeId, $lineItemId ) {
+		$response = [
+			'success' => true,
+		];
+
+		$statementBuilder = (new StatementBuilder())
+			->where('lineItemId = :lineItemId and creativeId = :creativeId')
+			->withBindVariableValue('lineItemId', $lineItemId)
+			->withBindVariableValue('creativeId', $creativeId);
+
+		try {
+			$lineItemCreativeAssociationService = AdManagerService::get(\Google\AdsApi\AdManager\v201911\LineItemCreativeAssociationService::class);
+			$action = new DeleteLineItemCreativeAssociations();
+
+			$result = $lineItemCreativeAssociationService
+				->performLineItemCreativeAssociationAction(
+					$action,
+					$statementBuilder->toStatement()
+				);
+
+			if ($result !== null && $result->getNumChanges() > 0) {
+				$response['success'] = true;
+			} else {
+				$response['message'] = 'Could not delete creative in line item ' . $lineItemId;
+			}
+		} catch ( \Exception $e ) {
+			$response['success'] = false;
+			$response['message'] = $e->getMessage();
+		}
+
+		return $response;
+	}
+
+	public function count( $lineItemId ) {
+		$statementBuilder = (new StatementBuilder())
+			->where('lineItemId = :lineItemId')
+			->withBindVariableValue('lineItemId', $lineItemId);
+
+		$lineItemCreativeAssociationService = AdManagerService::get(\Google\AdsApi\AdManager\v201911\LineItemCreativeAssociationService::class);
+
+		$result = $lineItemCreativeAssociationService->getLineItemCreativeAssociationsByStatement($statementBuilder->toStatement());
+
+		return count($result->getResults());
 	}
 }

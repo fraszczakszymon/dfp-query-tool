@@ -188,21 +188,23 @@ class LineItemService
 			if ($page->getResults() !== null) {
 				$totalResultSetSize = $page->getTotalResultSetSize();
 				foreach ($page->getResults() as $lineItem) {
-					$wasKeyInSet = false;
+					$foundKey = null;
 					if (null !== $lineItem->getTargeting()->getCustomTargeting()) {
 						$targetingSets = $lineItem->getTargeting()->getCustomTargeting()->getChildren();
 						foreach ($targetingSets as $targetingSet) {
 							$keyValuePairs = $targetingSet->getChildren();
 							foreach ($keyValuePairs as $pair) {
 								if (method_exists($pair, 'getKeyId') && in_array($pair->getKeyId(), $keyIds)) {
-									$wasKeyInSet = true;
+									$foundKey = $pair->getKeyId();
 								}
 							}
 						}
-						if ($wasKeyInSet) {
+						if ($foundKey !== null) {
 							$lineItems[] = [
+								'name' => $lineItem->getName(),
 								'line_item_id' => $lineItem->getId(),
 								'order_id' => $lineItem->getOrderId(),
+								'key' => $foundKey,
 							];
 						}
 					}
@@ -310,9 +312,14 @@ class LineItemService
 		$this->lineItemService->updateLineItems( [ $lineItem ] );
 	}
 
-	public function renameKeyInLineItemTargeting($lineItem, $oldKeyId, $newKeyId) {
-		$oldValuesMap = $this->customTargetingService->getAllValueIds($oldKeyId);
-		$newValuesMap = $this->customTargetingService->getAllValueIds($newKeyId);
+	public function renameKeyInLineItemTargeting($lineItem, $keyIdsMap) {
+		$valuesMap = [];
+		$isUpdated = false;
+
+		foreach ($keyIdsMap as $oldKeyId => $newKeyId) {
+			$valuesMap[$oldKeyId] = $this->customTargetingService->getAllValueIds($oldKeyId);
+			$valuesMap[$newKeyId] = $this->customTargetingService->getAllValueIds($newKeyId);
+		}
 
 		$customTargetingSets = $lineItem->getTargeting()->getCustomTargeting()->getChildren();
 
@@ -320,32 +327,47 @@ class LineItemService
 			if ($customTargetingSet instanceof CustomCriteriaSet) {
 				$keyValuePairs = $customTargetingSet->getChildren();
 
-				foreach ($keyValuePairs as $keyValuePair) {
-					if ($oldKeyId === $keyValuePair->getKeyId()) {
-						$keyValueNames = $this->customTargetingService->getValuesNamesFromMap(
-							$keyValuePair->getValueIds(),
-							$oldValuesMap
-						);
-						$missingValues = array_diff($keyValueNames, array_values($newValuesMap));
+				foreach ($keyIdsMap as $oldKeyId => $newKeyId) {
+					foreach ($keyValuePairs as $keyValuePair) {
+						if ($oldKeyId === $keyValuePair->getKeyId()) {
+							$oldValuesMap = $valuesMap[$oldKeyId];
+							$newValuesMap = $valuesMap[$newKeyId];
 
-						if (count($missingValues) > 0) {
-							$this->customTargetingService->addValuesToKeyById($newKeyId, $missingValues);
-							$newValuesMap = $this->customTargetingService->getAllValueIds($newKeyId);
+							$keyValueNames = $this->customTargetingService->getValuesNamesFromMap(
+								$keyValuePair->getValueIds(),
+								$oldValuesMap
+							);
+							$missingValues = array_diff($keyValueNames, array_values($newValuesMap));
+
+							if (count($missingValues) > 0) {
+								$this->customTargetingService->addValuesToKeyById($newKeyId, $missingValues);
+								$valuesMap[$newKeyId] = $this->customTargetingService->getAllValueIds($newKeyId);
+								$newValuesMap = $valuesMap[$newKeyId];
+							}
+
+							$newValueIds = $this->customTargetingService->getValuesIdsFromMap(
+								$keyValueNames,
+								$newValuesMap
+							);
+
+							$keyValuePair->setKeyId($newKeyId);
+							$keyValuePair->setValueIds($newValueIds);
+							$isUpdated = true;
 						}
-
-						$newValueIds = $this->customTargetingService->getValuesIdsFromMap(
-							$keyValueNames,
-							$newValuesMap
-						);
-
-						$keyValuePair->setKeyId($newKeyId);
-						$keyValuePair->setValueIds($newValueIds);
 					}
 				}
 			}
 		}
 
-		$this->lineItemService->updateLineItems( [ $lineItem ] );
+		if ($isUpdated) {
+			try {
+				$this->lineItemService->updateLineItems( [ $lineItem ] );
+			} catch (\Exception $e) {
+				printf("\n\nError occurred while updating %s line item:\n", $lineItem->getId());
+				printf($e->getMessage());
+				printf("\n\n");
+			}
+		}
 	}
 
 	private function validateForm($form) {

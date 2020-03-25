@@ -21,8 +21,7 @@ class OrderLineItemsKeyRenameCommand extends Command
 		$this->setName('order:key-values:rename-key')
 			->setDescription('Renames key in all line items custom targeting in order')
 			->addArgument('order-id', InputArgument::REQUIRED, 'Order ID')
-			->addArgument('old-key', InputArgument::REQUIRED, 'Old key')
-			->addArgument('new-key', InputArgument::REQUIRED, 'New key');
+			->addArgument('old-new-keys-map', InputArgument::REQUIRED, 'Old and new keys map (example: hb_pb:hb_pb_appnexus,hb_size:hb_size_appnexus');
 	}
 
 	protected function execute(InputInterface $input, OutputInterface $output)
@@ -31,14 +30,25 @@ class OrderLineItemsKeyRenameCommand extends Command
 		$lineItemService = new LineItemService();
 
 		$orderId = $input->getArgument('order-id');
-		$oldKeyName = substr($input->getArgument('old-key'), 0, 20);
-		$newKeyName = substr($input->getArgument('new-key'), 0, 20);
 
-		list($oldKeyId, $newKeyId) = $customTargetingService->getKeyIds([$oldKeyName, $newKeyName]);
+		$keyIdsMap = [];
+
+		$pairs = explode(',', $input->getArgument('old-new-keys-map'));
+		foreach ($pairs as $pair) {
+			list ($old, $new) = explode(':', $pair);
+
+			$oldKeyName = substr(trim($old), 0, 20);
+			$newKeyName = substr(trim($new), 0, 20);
+
+			list($oldKeyId, $newKeyId) = $customTargetingService->getKeyIds([$oldKeyName, $newKeyName]);
+
+			$keyIdsMap[$oldKeyId] = $newKeyId;
+		}
+
 		$lineItems = $lineItemService->getLineItemsInOrder($orderId);
 
 		foreach ($lineItems as $i => $lineItem) {
-			$lineItemService->renameKeyInLineItemTargeting($lineItem, $oldKeyId, $newKeyId);
+			$lineItemService->renameKeyInLineItemTargeting($lineItem, $keyIdsMap);
 
 			printf('.');
 

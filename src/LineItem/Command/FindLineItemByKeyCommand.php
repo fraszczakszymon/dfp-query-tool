@@ -31,11 +31,12 @@ class FindLineItemByKeyCommand extends Command
 		$keys = explode(',', $input->getArgument('keys'));
 
 		$keyIds = $customTargetingService->getKeyIds($keys);
+		$map = array_combine($keyIds, $keys);
 
 		$lineItems = $lineItemService->findLineItemIdsByKeys($keyIds);
 
 		foreach ($lineItems as $lineItem) {
-			printf(" - order: %s, line item: %s\n", $lineItem['order_id'], $lineItem['line_item_id']);
+			printf(" - name: %s, key: %s, order: %s, line item: %s\n", $lineItem['name'], $map[$lineItem['key']], $lineItem['order_id'], $lineItem['line_item_id']);
 		}
 	}
 }
