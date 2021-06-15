@@ -1,7 +1,7 @@
 CURRENT_DIR := $(shell pwd)
-DEPLOYER=artifactory.wikia-inc.com/ops/k8s-deployer:latest
+DEPLOYER=artifactory.wikia-inc.com/ops/k8s-deployer:0.0.29
 IMAGE=artifactory.wikia-inc.com/aden/dfp-query-tool
-TAG=latest
+TAG=0.0.4
 
 # Build Docker image
 build:

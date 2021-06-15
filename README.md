@@ -162,8 +162,25 @@ A cron job is defined in k8s-cron-jobs directory:
 * It is designed to periodically (4 times a day) approve suggested ad units
 * It runs in k8s in the dev env
 * It uses manually created credentials `adeng-query-tool-credentials`
+* Its main job is to run `app/console suggested-adunits:approve`
 
 To see logs, go to https://dashboard.poz-dev.k8s.wikia.net:30080/#!/job?namespace=dev, select job with name starting from `dfp-query-tool-` and click on "Logs" icon.
+
+### How to build and deploy new version for cron jobs?
+
+1. Bump the version in the TAG variable in `Makefile` and the `k8s-cron-jobs/dfp-query-tool-poz-dev.yaml` file
+2. Run `make build` in order to build a dfp-query-tool image
+3. Run `make push` in order to push the image to artifactory
+4. Verify in [artifactory](https://artifactory.wikia-inc.com/ui/repos/tree/General/dockerv2-local%2Faden%2Fdfp-query-tool) if the image with correct tag (version) has been created
+5. Run `make delete` in order to remove existing cronjob from k8s
+6. Run `make deploy` in order to create new cronjob in k8s
+7. Verify in [k8s dashboard](https://dashboard.poz-dev.k8s.wikia.net:30080/#/search?namespace=dev&q=dfp-query) if the container has been created
+
+### Troubleshooting
+
+If the built image somehow does not get pushed to the k8s check the latest version of [`k8s-deployer`](https://artifactory.wikia-inc.com/ui/repos/tree/General/dockerv2-local%2Fops%2Fk8s-deployer) and update it in the `dfp-query-tool-poz-dev.yaml` file.
+
+In order to get to the k8s dashboard you need to use [Valut](https://wikia-inc.atlassian.net/wiki/spaces/OPS/pages/132317429/Vault%2BFor%2BEngineers) to get the dashboard-user token.
 
 ## Development
 
